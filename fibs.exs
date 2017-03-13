@@ -19,12 +19,13 @@ defmodule FibSolver do
 end
 
 
-
 defmodule Scheduler do
     
-    def run(num_processes, module, func, to_calculate) do
-        (1..num_processes)
-        |> Enum.map(fn(_) -> spawn(module, func, [self]) end)
+    def run(nodes, num_processes, module, func, to_calculate) do
+
+        nodes
+        |> Enum.take(num_processes)
+        |> Enum.map(fn(cluster_node) -> Node.spawn(cluster_node, module, func, [self]) end)
         |> schedule_processes(to_calculate, [])
     end
 
@@ -48,17 +49,33 @@ defmodule Scheduler do
 
 end
 
-to_process = List.duplicate(37, 20)
 
-Enum.each 1..20, fn num_processes ->
-  {time, result} = :timer.tc(
-    Scheduler, :run,
-    [num_processes, FibSolver, :fib, to_process]
-  )
+defmodule FibRunner do
+    
+    def run() do
+        
+        to_process = List.duplicate(39, 20)
+        all_nodes = [Node.self()] ++ Node.list()
 
-  if num_processes == 1 do
-    IO.puts inspect result
-    IO.puts "\n #   time (s)"
-  end
-  :io.format "~2B     ~.2f~n", [num_processes, time/1000000.0]
+        core_nodes = 
+            Enum.flat_map(all_nodes, fn(node) -> List.duplicate(node, 4) end )
+
+        len = length core_nodes
+
+        Enum.each 1..len, fn num_processes ->
+        {time, result} = :timer.tc(
+            Scheduler, :run,
+            [core_nodes, num_processes, FibSolver, :fib, to_process]
+        )
+
+        if num_processes == 1 do
+            IO.puts inspect result
+            IO.puts "\n #   time (s)"
+        end
+        :io.format "~2B     ~.2f~n", [num_processes, time/1000000.0]
+        end
+
+    end
+
 end
+
